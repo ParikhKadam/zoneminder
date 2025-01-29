@@ -15,7 +15,7 @@ endif()
 
 project(jwt-cpp)
 
-option(JWT_BUILD_EXAMPLES "Configure CMake to build examples (or not)" ON)
+option(JWT_BUILD_EXAMPLES "Configure CMake to build examples (or not)" OFF)
 option(JWT_BUILD_TESTS "Configure CMake to build tests (or not)" OFF)
 option(JWT_ENABLE_COVERAGE "Enable code coverage testing" OFF)
 option(JWT_ENABLE_FUZZING "Enable fuzz testing" OFF)
@@ -131,7 +131,7 @@ endif()
 configure_package_config_file(
   ${CMAKE_CURRENT_LIST_DIR}/cmake/jwt-cpp-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/jwt-cpp-config.cmake
   INSTALL_DESTINATION ${JWT_CMAKE_FILES_INSTALL_DIR} PATH_VARS JWT_EXTERNAL_PICOJSON JWT_SSL_LIBRARY)
-write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/jwt-cpp-config-version.cmake VERSION 0.6.0
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/jwt-cpp-config-version.cmake VERSION 0.7.0
                                  COMPATIBILITY ExactVersion)
 
 install(TARGETS jwt-cpp EXPORT jwt-cpp-targets PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

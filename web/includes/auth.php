@@ -234,7 +234,7 @@ function calculateAuthHash($remoteAddr='') {
 function generateAuthHash($useRemoteAddr, $force=false) {
   global $user;
   if (!isset($_SESSION['remoteAddr'])) $_SESSION['remoteAddr'] = '';
-  if (ZM_OPT_USE_AUTH and (ZM_AUTH_RELAY == 'hashed') and $user and $user->Username() and $user->Password()) {
+  if (ZM_OPT_USE_AUTH and (ZM_AUTH_RELAY == 'hashed') and $user and $user->Username()) {
     if (!isset($_SESSION)) {
       # Appending the remoteAddr prevents us from using an auth hash generated for a different ip
       #$auth = calculateAuthHash($useRemoteAddr?$_SESSION['remoteAddr']:'');
@@ -244,15 +244,16 @@ function generateAuthHash($useRemoteAddr, $force=false) {
       $time = time();
       # We use 1800 so that we regenerate the hash at half the TTL
       $mintime = $time - (ZM_AUTH_HASH_TTL * 1800);
+      $remoteAddr = ZM_AUTH_HASH_IPS ? $_SESSION['remoteAddr'] : '';
       # Appending the remoteAddr prevents us from using an auth hash generated for a different ip
-      if ($force or ( !isset($_SESSION['AuthHash'.$_SESSION['remoteAddr']]) ) or ( $_SESSION['AuthHashGeneratedAt'] < $mintime )) {
-        $auth = calculateAuthHash($useRemoteAddr ? $_SESSION['remoteAddr'] : '');
+      if ($force or ( !isset($_SESSION['AuthHash'.$remoteAddr]) ) or ( $_SESSION['AuthHashGeneratedAt'] < $mintime )) {
+        $auth = calculateAuthHash($useRemoteAddr ? $remoteAddr : '');
         # Don't both regenerating Auth Hash if an hour hasn't gone by yet
-        $_SESSION['AuthHash'.$_SESSION['remoteAddr']] = $auth;
+        $_SESSION['AuthHash'.$remoteAddr] = $auth;
         $_SESSION['AuthHashGeneratedAt'] = $time;
         # Because we don't write out the session, it shouldn't actually get written out to disk.  However if it does, the GeneratedAt should protect us.
       } # end if AuthHash is not cached
-      return $_SESSION['AuthHash'.$_SESSION['remoteAddr']];
+      return $_SESSION['AuthHash'.$remoteAddr];
     }
   } # end if using AUTH and AUTH_RELAY
   return '';
@@ -301,13 +302,17 @@ function visibleMonitor($mid) {
 
 function canView($area, $mid=false) {
   global $user;
-
-  return ( $user && $user->$area() && ($user->$area() == 'View' || $user->$area() == 'Edit') && ( !$mid || visibleMonitor($mid) ) );
+  if (!$user) return false;
+  if ($mid) return visibleMonitor($mid);
+  return ($user->$area() && ($user->$area() != 'None'));
 }
 
 function editableMonitor($mid) {
   global $user;
-  if (!$user) return false;
+  if (!$user) {
+    ZM\Debug("Not logged in");
+    return false;
+  }
 
   global $monitor_permissions;
 
@@ -316,9 +321,11 @@ function editableMonitor($mid) {
     $monitor_permissions = array_to_hash_by_key('MonitorId', ZM\Monitor_Permission::find(array('UserId'=>$user->Id())));
   }
   if (isset($monitor_permissions[$mid]) and 
-    ($monitor_permissions[$mid]->Permission() == 'None' or $monitor_permissions[$mid]->Permission() == 'View') )
+    ($monitor_permissions[$mid]->Permission() == 'None' or $monitor_permissions[$mid]->Permission() == 'View')
+  ) {
+    ZM\Debug("Have monitor permission == ".$monitor_permissions[$mid]->Permission());
     return false;
-
+  }
 
   global $group_permissions;
   if ($group_permissions === null)
@@ -326,28 +333,40 @@ function editableMonitor($mid) {
 
   # If denied view in any group, then can't view it.
   foreach ($group_permissions as $permission) {
-    if (!$permission->canEditMonitor($mid)) {
-      return false;
+    $perm_value = $permission->MonitorPermission($mid);
+    ZM\Debug("Have group permission $perm_value");
+    if ($perm_value == 'Edit') {
+      return true;
     }
   }
 
-  return ($user->Monitors() == 'Edit');
+  ZM\Debug("Monitors permission is ".$user->Monitors());
+  return (($user->Monitors() == 'Edit') || ($user->Monitors() == 'Create'));
 }
 
 function canEdit($area, $mid=false) {
   global $user;
 
-  return ( $user && ($user->$area() == 'Edit') && ( !$mid || visibleMonitor($mid) ));
+  if (!$user) return false;
+  if ($mid) return editableMonitor($mid);
+  return ($user->$area() == 'Edit' or $user->$area() == 'Create');
+}
+
+function canCreate($area) {
+  global $user;
+
+  return ( $user && ($user->$area() == 'Create') );
 }
 
 function userFromSession() {
   $user = null; // Not global
   if (isset($_SESSION['username'])) {
+    $remoteAddr = ZM_AUTH_HASH_IPS ? $_SESSION['remoteAddr'] : '';
     if (ZM_AUTH_HASH_LOGINS and (ZM_AUTH_RELAY == 'hashed')) {
       # Extra validation, if logged in, then the auth hash will be set in the session, so we can validate it.
       # This prevent session modification to switch users
-      if (isset($_SESSION['AuthHash'.$_SESSION['remoteAddr']]))
-        $user = getAuthUser($_SESSION['AuthHash'.$_SESSION['remoteAddr']]);
+      if (isset($_SESSION['AuthHash'.$remoteAddr]))
+        $user = getAuthUser($_SESSION['AuthHash'.$remoteAddr]);
       else
         ZM\Debug('No auth hash in session, there should have been');
     } else {

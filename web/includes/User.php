@@ -10,26 +10,26 @@ class User extends ZM_Object {
   protected static $table = 'Users';
 
   protected $Id;
-  protected $Username;
-  protected $Name;
-  protected $Email;
-  protected $Phone;
-  protected $Password;
-  protected $Language;
-  protected $Enabled;
-  protected $Stream;
-  protected $Events;
-  protected $Experiments;
-  protected $Control;
-  protected $Monitors;
-  protected $Groups;
-  protected $Devices;
-  protected $Snapshots;
-  protected $System;
-  protected $MaxBandwidth;
-  protected $TokenMinExpiry;
-  protected $APIEnabled;
-  protected $HomeView;
+  protected $Username = '';
+  protected $Name = '';
+  protected $Email = '';
+  protected $Phone = '';
+  protected $Password = '';
+  protected $Language = '';
+  protected $Enabled = 1;
+  protected $Stream = 'None';
+  protected $Events = 'None';
+  protected $Experiments = 'None';
+  protected $Control = 'None';
+  protected $Monitors = 'None';
+  protected $Groups = 'None';
+  protected $Devices = 'None';
+  protected $Snapshots = 'None';
+  protected $System = 'None';
+  protected $MaxBandwidth = '';
+  protected $TokenMinExpiry = 0;
+  protected $APIEnabled = 1;
+  protected $HomeView = 'console';
 
 
 	protected $defaults = array(
@@ -60,11 +60,11 @@ class User extends ZM_Object {
   private $Preferences;
 
   public static function find( $parameters = array(), $options = array() ) {
-    return ZM_Object::_find(get_class(), $parameters, $options);
+    return ZM_Object::_find(self::class, $parameters, $options);
   }
 
   public static function find_one( $parameters = array(), $options = array() ) {
-    return ZM_Object::_find_one(get_class(), $parameters, $options);
+    return ZM_Object::_find_one(self::class, $parameters, $options);
   }
 
   public function Name($new=null) {
@@ -87,7 +87,11 @@ class User extends ZM_Object {
 
   public function Group_Permissions() {
     if (!$this->Group_Permissions) {
+      if ($this->Id()) {
       $this->Group_Permissions = array_to_hash_by_key('GroupId', Group_Permission::find(['UserId'=>$this->Id()]));
+      } else {
+        $this->Group_Permissions = [];
+      }
     }
     return array_values($this->Group_Permissions);
   }
@@ -107,7 +111,11 @@ class User extends ZM_Object {
   public function Monitor_Permissions($new=-1) {
     if ($new != -1) $this->Monitor_Permissions = $new;
     if (!$this->Monitor_Permissions) {
-      $this->Monitor_Permissions = array_to_hash_by_key('MonitorId', Monitor_Permission::find(['UserId'=>$this->Id()]));
+      if ($this->Id()) {
+        $this->Monitor_Permissions = array_to_hash_by_key('MonitorId', Monitor_Permission::find(['UserId'=>$this->Id()]));
+      } else {
+        $this->Monitor_Permissions = [];
+      }
     }
     return array_values($this->Monitor_Permissions);
   }
@@ -135,9 +143,9 @@ class User extends ZM_Object {
     if (!$this->Preferences) $this->Preferences();
 
     if (!isset($this->Preferences[$name])) {
-      $mp = $this->Preferences[$name] = new User_Preference();
-      $mp->UserId($this->Id());
-      $mp->Name($name);
+      $up = $this->Preferences[$name] = new User_Preference();
+      $up->UserId($this->Id());
+      $up->Name($name);
     }
     return $this->Preferences[$name];
   }

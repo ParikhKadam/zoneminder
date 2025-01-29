@@ -25,6 +25,8 @@ class FilterTerm {
   public $cookie;
   public $placeholder;
   public $collate;
+  public $multiple;
+  public $chosen;
   public $tablename;
 
   public function __construct($filter = null, $term = null, $index=0) {
@@ -70,10 +72,11 @@ class FilterTerm {
       $this->cookie = isset($term['cookie']) ? $term['cookie'] : '';
       $this->placeholder = isset($term['placeholder']) ? $term['placeholder'] : null;
       $this->collate = isset($term['collate']) ? $term['collate'] : '';
+      $this->multiple = isset($term['multiple']) ? $term['multiple'] : '';
+      $this->chosen = isset($term['chosen']) ? $term['chosen'] : '';
 
     } else {
-      Warning("No term in FilterTerm constructor");
-      #Warning(print_r(debug_backtrace(), true));
+      Warning("No term in FilterTerm constructor".print_r(debug_backtrace(), true));
     }
   } # end function __construct
 
@@ -117,7 +120,7 @@ class FilterTerm {
       case 'StorageServerId':
       case 'ServerId':
         if ( $value == 'ZM_SERVER_ID' ) {
-          $value = ZM_SERVER_ID;
+          $value = defined('ZM_SERVER_ID') ? ZM_SERVER_ID : 0;
         } else if ( $value_upper == 'NULL' ) {
 
         } else {
@@ -240,7 +243,7 @@ class FilterTerm {
     case 'StorageServerId':
       return 'S.ServerId';
     case 'FilterServerId':
-      return ZM_SERVER_ID;
+      return 'ZM_SERVER_ID:'.(defined('ZM_SERVER_ID') ? ZM_SERVER_ID : 0);
       # Unspecified start or end, so assume start, this is to support legacy filters
     case 'DateTime':
       return 'E.StartDateTime';
@@ -385,19 +388,24 @@ class FilterTerm {
   public function test($event=null) {
     if ( !isset($event) ) {
       # Is a Pre Condition
-      Debug("Testing " . $this->attr);
       if ( $this->attr == 'DiskPercent' ) {
-        # The logic on this is really ugly.  We are going to treat it as an OR
-        foreach ( $this->filter->get_StorageAreas() as $storage ) {
-          $string_to_eval = 'return $storage->disk_usage_percent() '.$this->op.' '.$this->val.';';
-          try {
-            $ret = eval($string_to_eval);
-            Debug("Evalled $string_to_eval = $ret");
-            if ( $ret )
-              return true;
-          } catch ( Throwable $t ) {
-            Error('Failed evaluating '.$string_to_eval);
-            return false;
+        $storage_areas = $this->filter->get_StorageAreas();
+        # The logic on this when there are multiple storage areas breaks.  We will just use the first.
+        foreach ( $storage_areas as $storage ) {
+          Debug($storage->disk_usage_percent(). ' '.$this->op.'? '.$this->val);
+          switch ($this->op) {
+          case '=':
+            return ($storage->disk_usage_percent() == $this->val);
+          case '>':
+            return ($storage->disk_usage_percent() > $this->val);
+          case '<':
+            return ($storage->disk_usage_percent() < $this->val);
+          case '<=':
+            return ($storage->disk_usage_percent() <= $this->val);
+          case '>=':
+            return ($storage->disk_usage_percent() >= $this->val);
+          default:
+            Warning('Invalid op '.$this->op .' for DiskPercent.');
           }
         } # end foreach Storage Area
       } else if ( $this->attr == 'SystemLoad' ) {
@@ -418,9 +426,9 @@ class FilterTerm {
       # Is a Post Condition 
       if ( $this->attr == 'ExistsInFileSystem' ) {
         if ( 
-          ($this->op == 'IS' and $this->val == 'True')
+          ($this->op == 'IS' and $this->val == 'true')
           or
-          ($this->op == 'IS NOT' and $this->val == 'False')
+          ($this->op == 'IS NOT' and $this->val == 'false')
         ) {
           return file_exists($event->Path());
         } else {

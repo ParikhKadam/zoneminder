@@ -118,7 +118,7 @@ commonprep () {
         fi
     fi
 
-    RTSPVER="eab32851421ffe54fec0229c3efc44c642bc8d46"
+    RTSPVER="055d81fe1293429e496b19104a9ed3360755a440"
     if [ -e "build/RtspServer-${RTSPVER}.tar.gz" ]; then
         echo "Found existing RtspServer ${RTSPVER} tarball..."
     else
@@ -263,6 +263,18 @@ execpackpack () {
         parms=""
     fi
 
+    HOST_ARCH="$(uname -m)"
+    if [ "${ARCH}" != "${HOST_ARCH}" ] && [ "${HOST_ARCH}" == "x86_64" ]; then
+        case "${ARCH}" in
+            "armhf")
+                export PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--platform=linux/arm"
+                ;;
+            "aarch64")
+                export PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--platform=linux/arm64"
+                ;;
+        esac
+    fi
+
     if [ "${TRAVIS}" == "true"  ]; then
         # Travis will fail the build if the output gets too long
         # To mitigate that, use grep to filter out some of the noise
@@ -369,7 +381,7 @@ elif [ "${OS}" == "debian" ] || [ "${OS}" == "ubuntu" ] || [ "${OS}" == "raspbia
   setdebpkgname
   movecrud
 
-  if [ "${DIST}" == "bionic" ] || [ "${DIST}" == "focal" ] || [ "${DIST}" == "hirsute" ] || [ "${DIST}" == "impish" ] || [ "${DIST}" == "jammy" ] || [ "${DIST}" == "buster" ] || [ "${DIST}" == "bullseye" ] || [ "${DIST}" == "bookworm" ]; then
+  if [ "${DIST}" == "bionic" ] || [ "${DIST}" == "focal" ] || [ "${DIST}" == "hirsute" ] || [ "${DIST}" == "impish" ] || [ "${DIST}" == "jammy" ] || [ "${DIST}" == "noble" ] || [ "${DIST}" == "buster" ] || [ "${DIST}" == "bullseye" ] || [ "${DIST}" == "bookworm" ]; then
     ln -sfT distros/ubuntu2004 debian
   elif [ "${DIST}" == "beowulf" ]; then
     ln -sfT distros/beowulf debian
@@ -381,7 +393,7 @@ elif [ "${OS}" == "debian" ] || [ "${OS}" == "ubuntu" ] || [ "${OS}" == "raspbia
   execpackpack
 
   # Try to install and run the newly built zoneminder package
-  if [ "${OS}" == "ubuntu" ] && [ "${DIST}" == "bionic" ] && [ "${ARCH}" == "x86_64" ] && [ "${TRAVIS}" == "true" ]; then
+  if [ "${OS}" == "ubuntu" ] && [ "${DIST}" == "jammy" ] && [ "${ARCH}" == "x86_64" ] && [ "${TRAVIS}" == "true" ]; then
       echo "Begin Deb package installation..."
       install_deb
   fi

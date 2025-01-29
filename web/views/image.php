@@ -81,12 +81,11 @@ if (!empty($_REQUEST['proxy'])) {
 
   // set no time limit and disable compression:
   set_time_limit(5);
-  @apache_setenv('no-gzip', 1);
+  if (function_exists('apache_setenv')) @apache_setenv('no-gzip', 1);
   @ini_set('zlib.output_compression', 0);
 
   /* Sends an http request with additional headers shown above */
   $fp = @fopen($url, 'r', false, $context);
-  $r = '';
   if ($fp) {
     $meta_data = stream_get_meta_data($fp);
     ZM\Debug(print_r($meta_data, true));
@@ -99,13 +98,12 @@ if (!empty($_REQUEST['proxy'])) {
         $auth_header_array = explode(',', $auth_header);
         $parsed = array();
 
-
         foreach ($auth_header_array as $pair) {
           preg_match('/^\s*(\w+)="?(.+)"?\s*$/', $pair, $vals);
           if (!empty($vals)) {
             $parsed[$vals[1]] = trim($vals[2], '"');
           } else {
-            ZM\Debug("DIdn't match preg $pair");
+            ZM\Debug("Didn't match preg $pair");
           }
         }
         ZM\Debug(print_r($parsed, true));
@@ -145,6 +143,8 @@ if (!empty($_REQUEST['proxy'])) {
       } # end if have auth
     } # end foreach header
 
+    # Read in until we either stop reading or have a second Content-Length
+    $r = '';
     while (substr_count($r, 'Content-Length') != 2) {
       $new = fread($fp, 512);
       if (!$new) break;
@@ -159,9 +159,15 @@ if (!empty($_REQUEST['proxy'])) {
       if ($end > $start) {
         $frame = substr($r, $start, $end - $start);
         ZM\Debug("Start $start end $end");
-        echo $frame;
+        if (imagecreatefromstring($frame)) {
+          echo $frame;
+        }
       } else {
-        echo $r;
+        # This is possibly an XSS but I don't see how to get around it other than actually trying to parse it as a valid image first.
+        # So we only output it if imagecreatefromdata succeeds
+        if (imagecreatefromstring($r)) {
+          echo $r;
+        }
       }
     } else {
       $img = imagecreate(320, 240);
@@ -289,7 +295,7 @@ if ( empty($_REQUEST['path']) ) {
           $path = $Event->Path().'/'.sprintf('%0'.ZM_EVENT_IMAGE_DIGITS.'d', $Frame->FrameId()).'-'.$show.'.jpg';
         } else {
           header('HTTP/1.0 404 Not Found');
-          ZM\Error('No alarm jpg found for event '.$_REQUEST['eid'].' at '.$path);
+          ZM\Debug('No alarm jpg found for event '.$_REQUEST['eid'].' at '.$path);
           return;
         }
       } else {
@@ -325,26 +331,31 @@ if ( empty($_REQUEST['path']) ) {
                 $file_path = $Event->Path().'/'.$file;
               }
             }
-            $command = ZM_PATH_FFMPEG.' -ss '. $Frame->Delta() .' -i '.$file_path.' -frames:v 1 '.$path . ' 2>&1';
-            #$command ='ffmpeg -ss '. $Frame->Delta() .' -i '.$Event->Path().'/'.$Event->DefaultVideo().' -vf "select=gte(n\\,'.$Frame->FrameId().'),setpts=PTS-STARTPTS" '.$path;
-            #$command ='ffmpeg -v 0 -i '.$Storage->Path().'/'.$Event->Path().'/'.$Event->DefaultVideo().' -vf "select=gte(n\\,'.$Frame->FrameId().'),setpts=PTS-STARTPTS" '.$path;
-            ZM\Debug("Running $command");
-            $output = array();
-            $retval = 0;
-            exec($command, $output, $retval);
-            ZM\Debug("Command: $command, retval: $retval, output: " . implode("\n", $output));
-            if ( ! file_exists($path) ) {
+            if (file_exists($file_path)) {
+              $command = ZM_PATH_FFMPEG.' -ss '. $Frame->Delta() .' -i '.$file_path.' -frames:v 1 '.$path . ' 2>&1';
+              #$command ='ffmpeg -ss '. $Frame->Delta() .' -i '.$Event->Path().'/'.$Event->DefaultVideo().' -vf "select=gte(n\\,'.$Frame->FrameId().'),setpts=PTS-STARTPTS" '.$path;
+              #$command ='ffmpeg -v 0 -i '.$Storage->Path().'/'.$Event->Path().'/'.$Event->DefaultVideo().' -vf "select=gte(n\\,'.$Frame->FrameId().'),setpts=PTS-STARTPTS" '.$path;
+              ZM\Debug("Running $command");
+              $output = array();
+              $retval = 0;
+              exec($command, $output, $retval);
+              ZM\Debug("Command: $command, retval: $retval, output: " . implode("\n", $output));
+              if ( ! file_exists($path) ) {
+                header('HTTP/1.0 404 Not Found');
+                ZM\Error('Can\'t create frame images from video for this event '.$Event->DefaultVideo().'
+
+                  Command was: '.$command.'
+
+                  Output was: '.implode(PHP_EOL,$output) );
+                return;
+              }
+              # Generating an image file will use up more disk space, so update the Event record.
+              if ( $Event->EndDateTime() ) {
+                $Event->DiskSpace(null);
+              }
+            } else {
               header('HTTP/1.0 404 Not Found');
-              ZM\Error('Can\'t create frame images from video for this event '.$Event->DefaultVideo().'
-
-                Command was: '.$command.'
-
-                Output was: '.implode(PHP_EOL,$output) );
-              return;
-            }
-            # Generating an image file will use up more disk space, so update the Event record.
-            if ( $Event->EndDateTime() ) {
-              $Event->DiskSpace(null);
+              ZM\Error('Can\'t create frame images from missing video file at '.$Event->DefaultVideo());
             }
           } else {
             header('HTTP/1.0 404 Not Found');
@@ -523,7 +534,7 @@ ZM\Debug("Figuring out height using width: $height = ($width * $oldHeight) / $ol
         $i  = imagecreatetruecolor($width, $height);
         $bg_colour = imagecolorallocate($i, 255, 255, 255);
         $fg_colour = imagecolorallocate($i, 0, 0, 0);
-        imagefilledrectangle($im, 0, 0, $width, $height, $bg_colour);
+        imagefilledrectangle($i, 0, 0, $width, $height, $bg_colour);
         imagestring($i, 1, 5, 5, 'Unable to load jpeg from  ' . $scaled_path, $fg_colour);
         imagejpeg($i);
       } else {

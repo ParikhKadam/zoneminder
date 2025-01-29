@@ -234,9 +234,9 @@ function probeAmcrest($ip, $username='', $password='') {
   if (!$username) $username='admin';
   if (!$password) $password='password';
   $cameras = [];
-  $url = 'rtsp://'.$username.':'.$password.'@'.$ip.':554//cam/realmonitor?channel=1&subtype=0&unicast=true';
+  $url = 'rtsp://'.$username.':'.urlencode($password).'@'.$ip.':554/cam/realmonitor?channel=1&subtype=0&unicast=true';
   $camera = array(
-    'mjpegstream' => 'http://'.$username.':'.$password.'@'.$ip.'/cgi-bin/snapshot.cgi',
+    'mjpegstream' => 'http://'.$username.':'.urlencode($password).'@'.$ip.'/cgi-bin/snapshot.cgi',
     'ip'      => $ip,
     'Manufacturer' => 'Amcrest',
     #'Model' => 'Amcrest Camera',
@@ -257,7 +257,7 @@ function wget($method, $url, $username, $password) {
 }
 
 function curl($method, $url, $username, $password) {
-
+  if (function_exists('curl_version')) {
     $ch = curl_init();
     #curl_setopt($ch, CURLOPT_FORBID_REUSE, 1);
     #curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
@@ -279,6 +279,10 @@ function curl($method, $url, $username, $password) {
     $headerStr = substr( $res , 0 , $headerSize );
     $bodyStr = substr( $res , $headerSize );
     return $bodyStr;
+  } else {
+    ZM\Error("php-curl is not installed. Cannot use curl functions.");
+  }
+  return '';
 }
 
 function probeAzureWaveTechnologyInc($ip, $username, $password) {
@@ -831,7 +835,7 @@ function probeNetwork() {
           $cameras[$mac] = call_user_func('probe'.$macBase['type'], $ip, $username, $password);
         }
       } else {
-        ZM\Debug("No probe function for ${macBase['type']}");
+        ZM\Debug("No probe function for {$macBase['type']}");
         $cameras[$mac] = [['ip'=>$ip, 'Manufacturer'=>$macBase['vendor']]];
       }
     } else {
@@ -875,7 +879,7 @@ function probeNetwork() {
             }
           } else {
             $cameras[$mac] += [['ip'=>$ip, 'Manufacturer'=>$macBase['vendor']]];
-            ZM\Debug("No probe function for ${macBase['type']} ${macBase['vendor']}");
+            ZM\Debug("No probe function for {$macBase['type']} {$macBase['vendor']}");
           }
         } else {
           ZM\Debug("No match for $macRoot");

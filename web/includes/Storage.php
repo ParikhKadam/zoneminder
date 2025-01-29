@@ -7,21 +7,21 @@ require_once('Object.php');
 class Storage extends ZM_Object {
   protected static $table = 'Storage';
 
-  protected $Id;
-  protected $Path;
-  protected $Name;
-  protected $Type;
-  protected $Url;
-  protected $DiskSpace;
-  protected $Scheme;
-  protected $ServerId;
-  protected $DoDelete;
-  protected $Enabled;
+  public $Id;
+  public $Path;
+  public $Name;
+  public $Type = 'local';
+  public $Url;
+  public $DiskSpace;
+  public $Scheme = 'Medium';
+  public $ServerId;
+  public $DoDelete = 1;
+  public $Enabled = 1;
 
   protected $defaults = array(
     'Id'        => null,
     'Path'      => array('type'=>'text','filter_regexp'=>array('/[^\w\-\.\(\)\:\/ ]/','/\/$/'), 'default'=>''),
-    'Name'      => '',
+    'Name' => array('type'=>'text','filter_regexp'=>'/[^\w\-\.\(\)\:\/ ]/', 'default'=>'Storage'),
     'Type'      => 'local',
     'Url'       => '',
     'DiskSpace' => null,
@@ -31,11 +31,11 @@ class Storage extends ZM_Object {
     'Enabled'   => 1,
   );
   public static function find($parameters = array(), $options = array()) {
-    return ZM_Object::_find(get_class(), $parameters, $options);
+    return ZM_Object::_find(self::class, $parameters, $options);
   }
 
   public static function find_one($parameters = array(), $options = array()) {
-    return ZM_Object::_find_one(get_class(), $parameters, $options);
+    return ZM_Object::_find_one(self::class, $parameters, $options);
   }
 
   public function Path($new=null) {

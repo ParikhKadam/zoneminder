@@ -33,6 +33,8 @@ require ZoneMinder::Object;
 require ZoneMinder::Storage;
 require ZoneMinder::Frame;
 require ZoneMinder::Monitor;
+require ZoneMinder::Event_Tag;
+require ZoneMinder::Tag;
 require Date::Manip;
 require File::Find;
 require File::Path;
@@ -646,7 +648,7 @@ sub CopyTo {
 	($NewPath) = ( $NewPath =~ /^(.*)$/ ); # De-taint
   if ( $NewPath eq $OldPath ) {
     $ZoneMinder::Database::dbh->commit();
-    return "New path and old path are the same! $NewPath";
+    return "New path and old path are the same! $OldPath $NewPath";
   }
   Debug("Copying event $$self{Id} from $OldPath to $NewPath");
 
@@ -743,24 +745,25 @@ sub MoveTo {
 
   # In strange situations where commits don't happen, the files can be moved but the db hasn't been updated.
   # So here's a special case test to fix that.
-  my ( $SrcPath ) = ( $self->Path() =~ /^(.*)$/ ); # De-taint
-  my ( $NewPath ) = ( $NewStorage->Path() =~ /^(.*)$/ ); # De-taint
+  my ( $SrcPath ) = ( $self->Path(undef) =~ /^(.*)$/ ); # De-taint
+  my $NewPath = $NewStorage->Path().'/'.$self->RelativePath();
+  $NewPath =~ /^(.*)$/; # De-taint
+
   my $error = '';
-  if (! -e $SrcPath and -e $NewPath) {
-    Warning("Event has already been moved, just updating the event.");
+  if ((! -e $SrcPath) and -e $NewPath) {
+    Debug("srcPath: $SrcPath newPath: $NewPath");
+    Warning("Event has already been moved, just updating the event record in db.");
   } else {
     $error = $self->CopyTo($NewStorage);
+    return $error if $error;
   }
-  if (!$error) {
-    # Succeeded in copying all files, so we may now update the Event.
-    $$self{StorageId} = $$NewStorage{Id};
-    $self->Storage($NewStorage);
-    $error .= $self->save();
 
-    # Going to leave it to upper layer as to whether we rollback or not
-  }
-  $ZoneMinder::Database::dbh->commit() if !$was_in_transaction;
+  # Succeeded in copying all files, so we may now update the Event.
+  $self->Storage($NewStorage);
+  $error .= $self->save();
+  # Going to leave it to upper layer as to whether we rollback or not
   return $error if $error;
+  $ZoneMinder::Database::dbh->commit() if !$was_in_transaction;
 
   $self->delete_files($OldStorage);
   return $error;
@@ -772,6 +775,9 @@ sub recover_timestamps {
   my ( $Event, $path ) = @_;
   $path = $Event->Path() if ! $path;
 
+  # Get timestamp of the dir.  Any files older than this will override this as the starttime
+  my $starttime = (stat($path))[9];
+
   if ( !opendir(DIR, $path) ) {
     Error("Can't open directory '$path': $!");
     return;
@@ -780,7 +786,7 @@ sub recover_timestamps {
   Debug('Have ' . @contents . ' files in '.$path);
   closedir(DIR);
 
-  my @mp4_files = grep(/^\d+\-video\.mp4$/, @contents);
+  my @mp4_files = grep(/^\d+\-video\.\w+\.mp4$/, @contents);
   if ( @mp4_files ) {
     $$Event{DefaultVideo} = $mp4_files[0];
   }
@@ -799,6 +805,7 @@ sub recover_timestamps {
     my $first_file = "$path/$capture_jpgs[0]";
     ( $first_file ) = $first_file =~ /^(.*)$/;
     my $first_timestamp = (stat($first_file))[9];
+    $starttime = $first_timestamp if $first_timestamp < $starttime;
 
     my $last_file = $path.'/'.$capture_jpgs[@capture_jpgs-1];
     ( $last_file ) = $last_file =~ /^(.*)$/;
@@ -839,6 +846,7 @@ sub recover_timestamps {
     ( $file ) = $file =~ /^(.*)$/;
 
     my $first_timestamp = (stat($file))[9];
+    $starttime = $first_timestamp if $first_timestamp < $starttime;
     my $output = `ffprobe $file 2>&1`;
     my ($duration) = $output =~ /Duration: [:\.0-9]+/gm;
     Debug("From mp4 have duration $duration, start: $first_timestamp");
@@ -856,6 +864,7 @@ sub recover_timestamps {
   if ( @mp4_files ) {
     $Event->DefaultVideo($mp4_files[0]);
   }
+  $Event->StartDateTime( Date::Format::time2str('%Y-%m-%d %H:%M:%S', $starttime) );
 }
 
 sub files {
@@ -943,6 +952,31 @@ FROM `Frames` WHERE `EventId`=?';
       Notes => $self->Notes() . ' ' . $text,
     });
 } # end sub Close
+
+sub Event_Tags {
+  my $self = shift;
+  $$self{Event_Tags} = shift if @_;
+  if (!$$self{Event_Tags}) {
+    $$self{Event_Tags} = [ ZoneMinder::Event_Tag->find(EventId=>$$self{Id}) ];
+  }
+  return wantarray ? @{$$self{Event_Tags}} : $$self{Event_Tags};
+}
+
+sub Tags {
+  my $self = shift;
+  $$self{Tags} = shift if @_;
+
+  if (!$$self{Tags}) {
+    $$self{Tags} = [ map { $_->Tag() } $self->Event_Tags() ];
+  }
+  return wantarray ? @{$$self{Tags}} : $$self{Tags};
+}
+
+sub tags {
+  my $self = shift;
+  my @tags = map { $_->Name() } $self->Tags();
+  return wantarray ? @tags : \@tags;
+}
 
 1;
 __END__

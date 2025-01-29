@@ -136,6 +136,9 @@ function initPage() {
       }
     };
   });
+  document.querySelectorAll('select[name="newMonitor[Devices]"]').forEach(function(el) {
+    el.onchange = window['devices_onchange'].bind(el, el);
+  });
   document.querySelectorAll('input[name="newMonitor[Width]"]').forEach(function(el) {
     el.oninput = window['updateMonitorDimensions'].bind(el, el);
   });
@@ -153,13 +156,13 @@ function initPage() {
   });
   document.querySelectorAll('select[name="newMonitor[Type]"]').forEach(function(el) {
     el.onchange = function() {
-      var form = document.getElementById('contentForm');
+      const form = document.getElementById('contentForm');
       form.tab.value = 'general';
       form.submit();
     };
   });
   document.querySelectorAll('input[name="newMonitor[ImageBufferCount]"],input[name="newMonitor[MaxImageBufferCount]"],input[name="newMonitor[Width]"],input[name="newMonitor[Height]"],input[name="newMonitor[PreEventCount]"]').forEach(function(el) {
-    el.oninput = window['update_estimated_ram_use'].bind(el);
+    el.oninput = window['buffer_setting_oninput'].bind(el);
   });
   update_estimated_ram_use();
 
@@ -167,8 +170,10 @@ function initPage() {
     el.onchange = function() {
       if (this.value == 1 /* Encode */) {
         $j('.OutputCodec').show();
+        $j('.WallClockTimeStamps').hide();
         $j('.Encoder').show();
       } else {
+        $j('.WallClockTimeStamps').show();
         $j('.OutputCodec').hide();
         $j('.Encoder').hide();
       }
@@ -303,11 +308,8 @@ function initPage() {
     });
 
     const Janus_Use_RTSP_Restream = form.elements['newMonitor[Janus_Use_RTSP_Restream]'];
-    if (Janus_Use_RTSP_Restream.length) {
-      Janus_Use_RTSP_Restream[0].onclick = Janus_Use_RTSP_Restream_onclick;
-      console.log("Setup Janus_RTSP_Restream.onclick");
-    } else {
-      console.log("newMonitor[Janus_Use_RTSP_Restream] not found");
+    if (Janus_Use_RTSP_Restream) {
+      Janus_Use_RTSP_Restream.onclick = Janus_Use_RTSP_Restream_onclick;
     }
   }
 
@@ -351,45 +353,89 @@ function initPage() {
 
   if (parseInt(ZM_OPT_USE_GEOLOCATION)) {
     if (window.L) {
-      if (form.elements['newMonitor[Type]'].value != 'WebSite') {
-        const latitude = form.elements['newMonitor[Latitude]'].value;
-        const longitude = form.elements['newMonitor[Longitude]'].value;
-        map = L.map('LocationMap', {
-          center: L.latLng(latitude, longitude),
-          zoom: 8,
-          onclick: function() {
-            alert('click');
-          }
-        });
-        L.tileLayer(ZM_OPT_GEOLOCATION_TILE_PROVIDER, {
-          attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-          maxZoom: 18,
-          id: 'mapbox/streets-v11',
-          tileSize: 512,
-          zoomOffset: -1,
-          accessToken: ZM_OPT_GEOLOCATION_ACCESS_TOKEN,
-        }).addTo(map);
-        marker = L.marker([latitude, longitude], {draggable: 'true'});
-        marker.addTo(map);
-        marker.on('dragend', function(event) {
-          const marker = event.target;
-          const position = marker.getLatLng();
-          const form = document.getElementById('contentForm');
-          form.elements['newMonitor[Latitude]'].value = position.lat;
-          form.elements['newMonitor[Longitude]'].value = position.lng;
-        });
+      const latitude = form.elements['newMonitor[Latitude]'].value;
+      const longitude = form.elements['newMonitor[Longitude]'].value;
+      map = L.map('LocationMap', {
+        center: L.latLng(latitude, longitude),
+        zoom: 8,
+        onclick: function() {
+          alert('click');
+        }
+      });
+      L.tileLayer(ZM_OPT_GEOLOCATION_TILE_PROVIDER, {
+        attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+        maxZoom: 18,
+        id: 'mapbox/streets-v11',
+        tileSize: 512,
+        zoomOffset: -1,
+        accessToken: ZM_OPT_GEOLOCATION_ACCESS_TOKEN,
+      }).addTo(map);
+      marker = L.marker([latitude, longitude], {draggable: 'true'});
+      marker.addTo(map);
+      marker.on('dragend', function(event) {
+        const marker = event.target;
+        const position = marker.getLatLng();
+        const form = document.getElementById('contentForm');
+        form.elements['newMonitor[Latitude]'].value = position.lat;
+        ll2dms(form.elements['newMonitor[Latitude]']);
+        form.elements['newMonitor[Longitude]'].value = position.lng;
+        ll2dms(form.elements['newMonitor[Longitude]']);
+      });
+      map.invalidateSize();
+      $j("a[href='#pills-location']").on('shown.bs.tab', function(e) {
         map.invalidateSize();
-        $j("a[href='#pills-location']").on('shown.bs.tab', function(e) {
-          map.invalidateSize();
-        });
-      } // end if not website
+      });
     } else {
       console.log('Location turned on but leaflet not installed.');
     }
+    ll2dms(form.elements['newMonitor[Latitude]']);
+    ll2dms(form.elements['newMonitor[Longitude]']);
   } // end if ZM_OPT_USE_GEOLOCATION
 
   updateLinkedMonitorsUI();
+
+  // Setup the thumbnail video animation
+  if (!isMobile()) initThumbAnimation();
 } // end function initPage()
+
+function ll2dms(input) {
+  const latitude = document.getElementById('newMonitor[Latitude]');
+  if (latitude.value === '') return;
+  if (latitude.value < -90) latitude.value=-90;
+  if (latitude.value > 90) latitude.value=90;
+
+  const longitude = document.getElementById('newMonitor[Longitude]');
+  if (longitude.value === '') return;
+  if (longitude.value < -180) longitude.value=-180;
+  if (longitude.value > 180) longitude.value=180;
+  const dmsCoords = new DmsCoordinates(parseFloat(latitude.value), parseFloat(longitude.value));
+
+  if (input.id == 'newMonitor[Latitude]') {
+    const dms = document.getElementById('LatitudeDMS');
+    dms.value = dmsCoords.latitude.toString(2);
+  } else if (input.id == 'newMonitor[Longitude]') {
+    const dms = document.getElementById('LongitudeDMS');
+    dms.value = dmsCoords.longitude.toString(2);
+  } else {
+    console.log("Unknown input in ll2dms");
+  }
+  updateMarker();
+}
+
+function dms2ll(input) {
+  const latitude = document.getElementById('newMonitor[Latitude]');
+  const longitude = document.getElementById('newMonitor[Longitude]');
+  const dms = parseDms(input.value);
+
+  if (input.id == 'LatitudeDMS') {
+    latitude.value = dms.toFixed(8);
+  } else if (input.id == 'LongitudeDMS') {
+    longitude.value = dms.toFixed(8);
+  } else {
+    console.log('Unknown input in dms2ll');
+  }
+  updateMarker();
+}
 
 function change_Path(event) {
   const pathInput = document.getElementsByName("newMonitor[Path]")[0];
@@ -466,6 +512,20 @@ function random_WebColour() {
   );
 }
 
+function buffer_setting_oninput(e) {
+  const max_image_buffer_count = document.getElementById('newMonitor[MaxImageBufferCount]');
+  const pre_event_count = document.getElementById('newMonitor[PreEventCount]');
+  if (parseInt(max_image_buffer_count.value) &&
+    (parseInt(pre_event_count.value) > parseInt(max_image_buffer_count.value))
+  ) {
+    if (this.id == 'newMonitor[PreEventCount]') {
+      max_image_buffer_count.value = pre_event_count.value;
+    } else {
+      pre_event_count.value = max_image_buffer_count.value;
+    }
+  }
+  update_estimated_ram_use();
+}
 function update_estimated_ram_use() {
   const form = document.getElementById('contentForm');
   if (form.elements['newMonitor[Type]'].value == 'WebSite') return;
@@ -475,11 +535,11 @@ function update_estimated_ram_use() {
   const colours = document.querySelectorAll('select[name="newMonitor[Colours]"]')[0].value;
 
   let min_buffer_count = parseInt(document.querySelectorAll('input[name="newMonitor[ImageBufferCount]"]')[0].value);
-  min_buffer_count += parseInt(document.querySelectorAll('input[name="newMonitor[PreEventCount]"]')[0].value);
+  min_buffer_count += parseInt(document.getElementById('newMonitor[PreEventCount]').value);
   const min_buffer_size = min_buffer_count * width * height * colours;
   document.getElementById('estimated_ram_use').innerHTML = 'Min: ' + human_filesize(min_buffer_size);
 
-  const max_buffer_count = parseInt(document.querySelectorAll('input[name="newMonitor[MaxImageBufferCount]"]')[0].value);
+  const max_buffer_count = parseInt(document.getElementById('newMonitor[MaxImageBufferCount]').value);
   if (max_buffer_count) {
     const max_buffer_size = (min_buffer_count + max_buffer_count) * width * height * colours;
     document.getElementById('estimated_ram_use').innerHTML += ' Max: ' + human_filesize(max_buffer_size);
@@ -488,16 +548,23 @@ function update_estimated_ram_use() {
   }
 }
 
-function updateLatitudeAndLongitude(latitude, longitude) {
-  var form = document.getElementById('contentForm');
-  form.elements['newMonitor[Latitude]'].value = latitude;
-  form.elements['newMonitor[Longitude]'].value = longitude;
+function updateMarker() {
+  const latitude = document.getElementById('newMonitor[Latitude]').value;
+  const longitude = document.getElementById('newMonitor[Longitude]').value;
+  console.log("Updating marker at ", latitude, longitude);
   const latlng = new L.LatLng(latitude, longitude);
   marker.setLatLng(latlng);
   map.setView(latlng, 8, {animation: true});
   setTimeout(function() {
     map.invalidateSize(true);
   }, 100);
+}
+
+function updateLatitudeAndLongitude(latitude, longitude) {
+  var form = document.getElementById('contentForm');
+  form.elements['newMonitor[Latitude]'].value = latitude;
+  form.elements['newMonitor[Longitude]'].value = longitude;
+  updateMarker(latitude, longitude);
 }
 
 function getLocation() {
@@ -612,6 +679,17 @@ function Model_onchange(input) {
 
 function updateLinkedMonitorsUI() {
   expr_to_ui($j('[name="newMonitor[LinkedMonitors]"]').val(), $j('#LinkedMonitorsUI'));
+}
+
+function devices_onchange(devices) {
+  const selected = $j(devices).val();
+  const device = devices.form.elements['newMonitor[Device]'];
+  if (selected !== '') {
+    device.value = selected;
+    device.style['display'] = 'none';
+  } else {
+    device.style['display'] = 'inline';
+  }
 }
 
 window.addEventListener('DOMContentLoaded', initPage);

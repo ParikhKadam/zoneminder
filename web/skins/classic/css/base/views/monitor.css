@@ -17,8 +17,11 @@ input[name="newMonitor[LabelFormat]"],
 input[name="newMonitor[ControlDevice]"],
 input[name="newMonitor[ControlAddress]"],
 input[name="newMonitor[ONVIF_URL]"],
+input[name="newMonitor[ONVIF_Events_Path]"],
 input[name="newMonitor[ONVIF_Options]"],
 input[name="newMonitor[ONVIF_Alarm_Text]"],
+input[name="newMonitor[EventStartCommand]"],
+input[name="newMonitor[EventEndCommand]"],
 input[name="newMonitor[MQTT_Subscriptions]"] {
   width: 100%;
 	min-width: 240px;

@@ -142,7 +142,7 @@ if [ "$SNAPSHOT" == "stable" ]; then
     BRANCH=`git describe --tags $(git rev-list --tags --max-count=1)`;
     if [ -z "$BRANCH" ]; then
       # This should only happen in CI environments where tag info isn't available
-      BRANCH=`cat version.txt`
+      BRANCH=$(cat "$(find . -maxdepth 1 -name 'version' -o -name 'version.txt')")
       echo "Building branch $BRANCH"
     fi
     if [ "$BRANCH" == "" ]; then
@@ -180,7 +180,7 @@ fi;
 echo "git pull..."
 git pull
 # Grab the ZoneMinder version from the contents of the version file
-VERSION=$(cat version.txt)
+VERSION=$(cat "$(find . -maxdepth 1 -name 'version' -o -name 'version.txt')")
 if [ -z "$VERSION" ]; then
   exit 1;
 fi;
@@ -369,12 +369,12 @@ EOF
     if [ "$INTERACTIVE" != "no" ]; then
       read -p "Ready to dput $SC to $PPA ? Y/n...";
       if [[ "$REPLY" == "" || "$REPLY" == [yY] ]]; then
-        dput $PPA $SC
+        dput -d $PPA $SC
       fi;
     else
       if [ "$DPUT" != "no" ]; then
         echo "dputting to $PPA";
-        dput $PPA $SC
+        dput -d $PPA $SC
       fi;
     fi;
   fi;

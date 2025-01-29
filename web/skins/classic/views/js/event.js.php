@@ -25,7 +25,7 @@ var eventData = {
     MonitorId: '<?php echo $Event->MonitorId() ?>',
     MonitorName: '<?php echo validJsStr($monitor->Name()) ?>',
     Cause: '<?php echo validHtmlStr($Event->Cause()) ?>',
-    <!-- Tags: '<?php echo validHtmlStr($Event->Tags()) ?>', -->
+    <!-- Tags: '<?php echo validHtmlStr(implode(', ', array_map(function($t){return $t->Name();}, $Event->Tags()))); ?>', -->
     Notes: `<?php echo $Event->Notes()?>`,
     Width: '<?php echo $Event->Width() ?>',
     Height: '<?php echo $Event->Height() ?>',
@@ -53,10 +53,10 @@ var yesStr = '<?php echo translate('Yes') ?>';
 var noStr = '<?php echo translate('No') ?>';
 
 var eventDataStrings = {
-    Id: '<?php echo translate('EventId') ?>',
-    Name: '<?php echo translate('EventName') ?>',
+    <!--Id: '<?php echo translate('EventId') ?>',-->
+    Name: '<?php echo translate('Name') ?>',
     MonitorId: '<?php echo translate('AttrMonitorId') ?>',
-    MonitorName: '<?php echo translate('AttrMonitorName') ?>',
+    MonitorName: '<?php echo translate('Monitor') ?>',
     Cause: '<?php echo translate('Cause') ?>',
     <!-- Tags is not necessary since tags are displayed above -->
     <!-- Tags: '<?php echo translate('Tags') ?>', -->  
@@ -65,16 +65,18 @@ var eventDataStrings = {
     EndDateTimeFormatted: '<?php echo translate('AttrEndTime') ?>',
     Length: '<?php echo translate('Duration') ?>',
     Frames: '<?php echo translate('AttrFrames') ?>',
-    AlarmFrames: '<?php echo translate('AttrAlarmFrames') ?>',
-    TotScore: '<?php echo translate('AttrTotalScore') ?>',
-    AvgScore: '<?php echo translate('AttrAvgScore') ?>',
-    MaxScore: '<?php echo translate('AttrMaxScore') ?>',
+    <!--AlarmFrames: '<?php echo translate('AttrAlarmFrames') ?>',-->
+    <!--TotScore: '<?php echo translate('AttrTotalScore') ?>',-->
+    <!--AvgScore: '<?php echo translate('AttrAvgScore') ?>',-->
+    <!--MaxScore: '<?php echo translate('AttrMaxScore') ?>',-->
+    Score: '<?php echo translate('Score') ?>',
     Resolution: '<?php echo translate('Resolution') ?>',
     DiskSpace: '<?php echo translate('DiskSpace') ?>',
-    Storage: '<?php echo translate('Storage') ?>',
+    <!--Storage: '<?php echo translate('Storage') ?>',-->
     Path: '<?php echo translate('Path') ?>',
-    Archived: '<?php echo translate('Archived') ?>',
-    Emailed: '<?php echo translate('Emailed') ?>'
+    <!--Archived: '<?php echo translate('Archived') ?>',-->
+    <!--Emailed: '<?php echo translate('Emailed') ?>'-->
+    Info: '<?php echo translate('Info') ?>'
 };
 if ( parseInt(ZM_OPT_USE_GEOLOCATION) ) {
   eventDataStrings.Location = '<?php echo translate('Location') ?>';
@@ -110,4 +112,10 @@ var translate = {
   "seconds": "<?php echo translate('seconds') ?>",
   "Fullscreen": "<?php echo translate('Fullscreen') ?>",
   "Exit Fullscreen": "<?php echo translate('Exit Fullscreen') ?>",
+  "Live": "<?php echo translate('Live') ?>",
+  "Edit": "<?php echo translate('Edit') ?>",
+  "All Events": "<?php echo translate('All Events') ?>",
+  "Info": "<?php echo translate('Info') ?>",
+  "Archived": "<?php echo translate('Archived') ?>",
+  "Emailed": "<?php echo translate('Emailed') ?>",
 };
